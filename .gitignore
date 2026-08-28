@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+_tmp_upload*
+*.tmp
+
+# Large model / asset files (>25MB, exceed GitHub file size limit or repo size warning)
+assets/BiRefNet_model/model.safetensors
+assets/models/WomanTrouser.obj
+assets/models/womannequin.obj
+
+# 服装参考大图（可选）
+# assets/clothing/*.jpg
+# assets/clothing/*.png

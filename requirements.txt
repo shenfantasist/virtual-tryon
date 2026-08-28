@@ -1,0 +1,15 @@
+# === 后端服务 ===
+flask>=3.0
+
+# === 图像处理 ===
+Pillow>=10.0
+opencv-python>=4.8
+numpy>=1.24
+
+# === AI 推理 ===
+torch>=2.0
+torchvision
+safetensors
+transformers>=4.30
+
+
