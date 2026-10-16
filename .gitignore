@@ -29,10 +29,7 @@ node_modules/
 
 # Large model / asset files (>25MB, exceed GitHub file size limit or repo size warning)
 *.safetensors
-WomanTrouser.obj
-womannequin.obj
 Woman-TS&Trouser.obj
-Woman-Trouser&TS.obj
 
 # 服装参考大图（可选）
 # assets/clothing/*.jpg
