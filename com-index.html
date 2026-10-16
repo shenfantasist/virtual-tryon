@@ -1,0 +1,1807 @@
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Virtual Try-On - 手机端</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+    canvas { display: block; }
+
+    /* ── 手机端响应式布局 ── */
+    #left-panel, #right-panel, #settings-panel {
+      position: fixed;
+      bottom: 56px;
+      left: 0;
+      right: 0;
+      width: 100%;
+      height: 33.33vh;
+      border: none;
+      border-top: 1px solid rgba(255,255,255,0.12);
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+      transform: translateY(calc(100% + 56px));
+      transition: transform 0.3s ease;
+      z-index: 20;
+      background: rgba(20, 20, 30, 0.88);
+      backdrop-filter: blur(12px);
+      color: #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      padding: 16px 18px;
+      overflow-y: auto;
+    }
+    #left-panel.expanded, #right-panel.expanded, #settings-panel.expanded {
+      transform: translateY(0);
+    }
+    #settings-panel { display: flex; }
+
+    /* 底部导航栏：工具 / 衣橱 / 设置 */
+    #bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      display: flex;
+      gap: 8px;
+      padding: 0 8px;
+      z-index: 30;
+      background: rgba(20, 20, 30, 0.95);
+      border-top: 1px solid rgba(255,255,255,0.12);
+    }
+    #bottom-nav .nav-item {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: #aaa;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      border-radius: 10px;
+      transition: color 0.2s, background 0.2s;
+    }
+    #bottom-nav .nav-item:hover { background: rgba(255,255,255,0.06); }
+    #bottom-nav .nav-item.active { color: #7c6ff7; background: rgba(124,111,247,0.12); }
+
+    #model-badge { top: 10px; font-size: 12px; padding: 6px 12px; }
+
+    /* ── 设置底部面板（手机端） ── */
+    #settings-panel input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #444;
+      background: #2a2a38;
+      color: #e0e0e0;
+      font-size: 14px;
+      margin-bottom: 14px;
+    }
+    #settings-panel .btn-row { display: flex; gap: 10px; justify-content: flex-end; }
+    #settings-panel button {
+      padding: 8px 18px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #settings-panel .btn-save { background: #7c6ff7; color: #fff; }
+    #settings-panel .btn-cancel { background: #3a3a50; color: #ccc; }
+    #settings-panel .status-msg { font-size: 12px; margin-top: 8px; min-height: 18px; }
+
+    .panel-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 12px;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .panel-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,0.12);
+    }
+
+    /* ── 左侧上半：工具框 ── */
+    #tools-box {
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+    }
+    #tools-box .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    #tools-box .row label {
+      min-width: 78px;
+      text-align: right;
+      color: #aaa;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+    #tools-box input[type="file"] {
+      flex: 1;
+      color: #ccc;
+      font-size: 12px;
+      min-width: 0;
+    }
+    #tools-box select {
+      flex: 1;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid #444;
+      background: #2a2a38;
+      color: #e0e0e0;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    #tools-box select:focus { outline: none; border-color: #7c6ff7; }
+    #tools-box button {
+      padding: 7px 14px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex: 1;
+    }
+    #btn-analyze { background: #3a3a50; color: #ccc; }
+    #btn-analyze:hover { background: #4a4a65; }
+    #btn-process {
+      background: linear-gradient(135deg, #7c6ff7, #5b4fcf);
+      color: #fff;
+    }
+    #btn-process:hover { background: linear-gradient(135deg, #8f83f8, #6b5fd8); }
+    #btn-process:disabled, #btn-analyze:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    #upload-status {
+      display: block;
+      font-size: 12px;
+      color: #999;
+      min-height: 16px;
+      text-align: center;
+      margin-top: 4px;
+    }
+    #upload-status.success { color: #4cff8d; }
+    #upload-status.error { color: #ff6b6b; }
+    #upload-status.info { color: #7c6ff7; }
+
+    /* ── 左侧下半：穿搭 ── */
+    #outfit-box { padding-top: 16px; flex: 1; }
+    .outfit-options {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+    .outfit-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 9px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.15s, border-color 0.15s;
+      user-select: none;
+    }
+    .outfit-option:hover { background: rgba(255,255,255,0.09); }
+    .outfit-option:has(input:checked) {
+      background: rgba(124,111,247,0.16);
+      border-color: rgba(124,111,247,0.55);
+    }
+    .outfit-option input[type="checkbox"] {
+      width: 17px;
+      height: 17px;
+      accent-color: #7c6ff7;
+      cursor: pointer;
+    }
+
+    /* ── 右侧：衣橱折叠框 ── */
+    #wardrobe-list { display: flex; flex-direction: column; gap: 12px; }
+    .accordion {
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .accordion-header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 13px 16px;
+      background: rgba(255,255,255,0.05);
+      color: #e0e0e0;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      text-align: left;
+    }
+    .accordion-header:hover { background: rgba(255,255,255,0.1); }
+    .accordion-header .chevron {
+      transition: transform 0.2s;
+      color: #aaa;
+      font-size: 12px;
+    }
+    .accordion.active .chevron { transform: rotate(180deg); }
+    .accordion-body { display: none; padding: 13px; }
+    .accordion.active .accordion-body { display: block; }
+
+    /* 横向 5 个格子 */
+    .slot-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+    .slot {
+      aspect-ratio: 3 / 4;
+      border: 1px dashed rgba(255,255,255,0.28);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.03);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255,255,255,0.3);
+      font-size: 24px;
+    }
+    .slot::before { content: '+'; }
+    /* 已放入衣服的格子 */
+    .slot.filled { border-style: solid; cursor: pointer; overflow: hidden; padding: 0; }
+    .slot.filled::before { content: none; }
+    .slot.filled img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .slot.filled:hover { border-color: #7c6ff7; }
+    .slot.filled.selected {
+      border-color: #7c6ff7;
+      box-shadow: 0 0 0 2px rgba(124,111,247,0.55);
+    }
+    /* 空格子：点击可直接选图 */
+    .slot:not(.filled) { cursor: pointer; }
+    .slot:not(.filled):hover { border-color: #7c6ff7; color: #7c6ff7; }
+    .slot.drag-over { border-color: #7c6ff7; box-shadow: 0 0 0 2px rgba(124,111,247,0.55); background: rgba(124,111,247,0.12); }
+    .slot.filled.dragging { opacity: 0.5; }
+
+    /* ── 模型标签（中部） ── */
+    #model-badge {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      background: rgba(20, 20, 30, 0.85);
+      backdrop-filter: blur(12px);
+      padding: 8px 16px;
+      border-radius: 8px;
+      color: #ccc;
+      font-size: 13px;
+      border: 1px solid rgba(255,255,255,0.08);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    /* 滚动条 */
+    #left-panel::-webkit-scrollbar, #right-panel::-webkit-scrollbar { width: 6px; }
+    #left-panel::-webkit-scrollbar-thumb, #right-panel::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.2);
+      border-radius: 3px;
+    }
+
+    /* --- Workbench (pin) panel --- */
+    #workbench-panel {
+      position: fixed;
+      bottom: 56px;
+      left: 0;
+      right: 0;
+      width: 100%;
+      height: 60vh;
+      border: none;
+      border-top: 1px solid rgba(255,255,255,0.12);
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+      transform: translateY(calc(100% + 56px));
+      transition: transform 0.3s ease;
+      z-index: 20;
+      background: rgba(20, 20, 30, 0.95);
+      backdrop-filter: blur(12px);
+      color: #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      padding: 12px 16px;
+      overflow-y: auto;
+    }
+    #workbench-panel.expanded { transform: translateY(0); }
+    .wb-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-shrink: 0; }
+    .wb-toolbar .pin-toggle {
+      width: 36px; height: 36px; border-radius: 50%; border: 2px solid #888;
+      background: #cc3333; cursor: pointer; transition: all 0.2s; flex-shrink: 0;
+    }
+    .wb-toolbar .pin-toggle.active { background: #33aa33; border-color: #33aa33; }
+    .wb-toolbar .wb-label { font-size: 14px; font-weight: 600; color: #ccc; }
+    .wb-toolbar .wb-btn {
+      padding: 6px 12px; border: none; border-radius: 6px;
+      font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .wb-toolbar .wb-btn-save { background: linear-gradient(135deg, #7c6ff7, #5b4fcf); color: #fff; }
+    .wb-toolbar .wb-btn-map { background: linear-gradient(135deg, #ff6b6b, #cc4444); color: #fff; }
+    .wb-toolbar .wb-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .wb-canvas-wrap {
+      flex: 1; position: relative; overflow: hidden; border-radius: 10px;
+      background: rgba(0,0,0,0.3); min-height: 200px;
+    }
+    .wb-canvas-wrap img {
+      width: 100%; height: 100%; object-fit: contain; display: block;
+      user-select: none; pointer-events: none;
+    }
+    .wb-canvas-wrap canvas {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: crosshair;
+    }
+    .wb-pin-count { font-size: 12px; color: #aaa; margin-top: 6px; flex-shrink: 0; }
+    .wb-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: #666; font-size: 14px; }
+
+    /* ── 3D 模型点选：右键/长按上下文菜单 ── */
+    #model-context-menu {
+      position: fixed;
+      z-index: 100;
+      background: rgba(24,24,36,0.96);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 10px;
+      padding: 6px;
+      min-width: 158px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+      display: none;
+      color: #e0e0e0;
+      font-size: 14px;
+      user-select: none;
+    }
+    #model-context-menu .cm-title {
+      padding: 6px 12px 8px;
+      font-size: 12px;
+      color: #aaa;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      margin-bottom: 4px;
+      white-space: nowrap;
+    }
+    #model-context-menu .cm-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 9px 12px;
+      border: none;
+      background: transparent;
+      color: #e0e0e0;
+      font-size: 13px;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: left;
+      white-space: nowrap;
+    }
+    #model-context-menu .cm-item:hover { background: rgba(124,111,247,0.16); }
+    #model-context-menu .cm-item.danger:hover { background: rgba(255,107,107,0.18); color: #ff6b6b; }
+
+    /* ── 衣橱格子右键/长按上下文菜单 ── */
+    #wardrobe-context-menu {
+      position: fixed;
+      z-index: 101;
+      background: rgba(24,24,36,0.96);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 10px;
+      padding: 6px;
+      min-width: 158px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+      display: none;
+      color: #e0e0e0;
+      font-size: 14px;
+      user-select: none;
+    }
+    #wardrobe-context-menu .cm-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 9px 12px;
+      border: none;
+      background: transparent;
+      color: #e0e0e0;
+      font-size: 13px;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: left;
+      white-space: nowrap;
+    }
+    #wardrobe-context-menu .cm-item:hover { background: rgba(255,107,107,0.18); color: #ff6b6b; }
+
+    /* ── 拖拽到人台渲染提示 ── */
+    #drop-hint {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 120;
+      background: rgba(124,111,247,0.92);
+      color: #fff;
+      padding: 14px 22px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+      pointer-events: none;
+      display: none;
+      white-space: nowrap;
+    }
+    #drop-hint.show { display: block; }
+  </style>
+</head>
+<body>
+
+  <!-- ══════════ 左侧面板 ══════════ -->
+  <div id="left-panel">
+    <!-- 上半边：工具框 -->
+    <div id="tools-box">
+      <div class="panel-title">🛠️ 工具</div>
+      <div class="row">
+        <label>📷 人物照片</label>
+        <input type="file" id="file-photo" accept="image/*" />
+      </div>
+      <div class="row">
+        <label>🎯 目标服装</label>
+        <select id="select-clothing">
+          <option value="upper">👕 上衣 (Upper)</option>
+          <option value="upper+vest">🦺 背心 (Vest)</option>
+          <option value="skirt">👗 裙子 (Skirt)</option>
+          <option value="pants" disabled>👖 裤子 (Pants — 暂无UV模板)</option>
+          <option value="dress" disabled>👘 连衣裙 (Dress — 暂无UV模板)</option>
+        </select>
+      </div>
+      <div class="row">
+        <button id="btn-analyze">🔍 分析照片</button>
+        <button id="btn-process">✨ 生成纹理</button>
+      </div>
+      <span id="upload-status"></span>
+    </div>
+
+    <!-- 下半边：穿搭（多选） -->
+    <div id="outfit-box">
+      <div class="panel-title">👗 穿搭</div>
+      <div class="outfit-options">
+        <label class="outfit-option"><input type="checkbox" value="upper" checked /> 👕 上衣</label>
+        <label class="outfit-option"><input type="checkbox" value="upper+vest" /> 🦺 背心</label>
+        <label class="outfit-option"><input type="checkbox" value="pants" /> 👖 裤子</label>
+        <label class="outfit-option"><input type="checkbox" value="skirt" /> 👗 裙子</label>
+        <label class="outfit-option"><input type="checkbox" value="dress" /> 👘 连衣裙</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 右侧面板：衣橱 ══════════ -->
+  <div id="right-panel">
+    <div class="panel-title">🧺 衣橱</div>
+    <div id="wardrobe-list">
+      <div class="accordion">
+        <button class="accordion-header" type="button">👕 上衣 <span class="chevron">▾</span></button>
+        <div class="accordion-body">
+          <div class="slot-grid">
+            <div class="slot filled" data-texture="assets/Texture/T-Shirt.png" data-seg="assets/clothing/Blue-T-Shirt_no_sleeves.png" data-clothing="upper"><img src="assets/clothing/Blue-T-Shirt_no_sleeves.png" alt="T-Shirt" /></div><div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div>
+          </div>
+        </div>
+      </div>
+      <div class="accordion">
+        <button class="accordion-header" type="button">🦺 背心 <span class="chevron">▾</span></button>
+        <div class="accordion-body">
+          <div class="slot-grid">
+            <div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div>
+          </div>
+        </div>
+      </div>
+      <div class="accordion">
+        <button class="accordion-header" type="button">👖 裤子 <span class="chevron">▾</span></button>
+        <div class="accordion-body">
+          <div class="slot-grid">
+            <div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 当前显示的模型 -->
+  <div id="model-badge">🧍 人台 + 上衣</div>
+
+  <!-- Workbench (pin) panel -->
+  <div id="workbench-panel">
+    <div class="panel-title">&#128204; 案台</div>
+    <div class="wb-toolbar">
+      <div class="pin-toggle" id="wb-pin-toggle" title="切换图钉模式"></div>
+      <span class="wb-label" id="wb-status">图钉模式: 关</span>
+      <button class="wb-btn wb-btn-save" id="wb-save-btn" disabled>&#128190; 保存图钉</button>
+      <button class="wb-btn wb-btn-map" id="wb-map-btn" disabled>&#127919; 映射纹理</button>
+    </div>
+    <div class="wb-canvas-wrap" id="wb-canvas-wrap">
+      <div class="wb-empty" id="wb-empty">完成AI处理后，分割图将显示在此处</div>
+    </div>
+    <div class="wb-pin-count" id="wb-pin-count"></div>
+  </div>
+
+  <!-- 手机端底部导航栏 -->
+  <nav id="bottom-nav">
+    <button class="nav-item" data-panel="left-panel" onclick="togglePanel('left-panel')">🛠 工具</button>
+    <button class="nav-item" data-panel="right-panel" onclick="togglePanel('right-panel')">🧺 衣橱</button>
+    <button class="nav-item" data-panel="workbench-panel" onclick="togglePanel('workbench-panel')">&#128204; 案台</button>
+    <button class="nav-item" data-panel="settings-panel" onclick="togglePanel('settings-panel')">⚙ 设置</button>
+  </nav>
+
+  <!-- 设置底部面板（手机端） -->
+  <div id="settings-panel">
+    <div class="panel-title">⚙ 设置</div>
+    <label style="font-size:13px;color:#aaa;">Flask 后端地址</label>
+    <input type="text" id="settings-api-input-mobile" placeholder="http://192.168.1.100:5000" />
+    <div class="status-msg" id="settings-status-mobile"></div>
+    <div class="btn-row">
+      <button class="btn-cancel" onclick="closeSettingsMobile()">取消</button>
+      <button class="btn-save" onclick="saveSettingsMobile()">保存</button>
+    </div>
+  </div>
+
+  <!-- 3D 模型右键/长按上下文菜单 -->
+  <div id="model-context-menu">
+    <div class="cm-title" id="cm-title">模型操作</div>
+    <button class="cm-item" id="cm-change" type="button">👗 换装</button>
+    <button class="cm-item" id="cm-remove" type="button">🗑️ 脱下</button>
+    <button class="cm-item" id="cm-transparent" type="button">👁 半透明</button>
+  </div>
+
+  <!-- 衣橱：空格子选图用的隐藏文件输入 -->
+  <input type="file" id="wardrobe-file-input" accept="image/*" style="display:none;" />
+
+  <!-- 衣橱格子右键/长按上下文菜单（弃除） -->
+  <div id="wardrobe-context-menu">
+    <button class="cm-item danger" id="wardrobe-cm-remove" type="button">🗑️ 弃除</button>
+  </div>
+
+  <!-- 拖拽到人台的提示 -->
+  <div id="drop-hint">📌 拖到空格子可移动，拖到人台可渲染</div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.157.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.157.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+    import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
+    import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+    // ─── 场景 ──────────────────────────────────────────
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xcccccc);
+
+    const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 100);
+    camera.position.set(0, 1.15, 2.5);
+    camera.lookAt(0, 1.15, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(0, 2, 2);
+    scene.add(dirLight);
+
+    const grid = new THREE.GridHelper(2, 20, 0x888888, 0x444444);
+    scene.add(grid);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.set(0, 1.15, 0);
+    controls.update();
+
+    // ─── 后期合成（用于服装边缘轮廓高亮 OutlinePass） ──
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    // OutputPass：负责色调映射 + sRGB 色彩空间转换，避免用 composer 渲染后画面变暗
+    composer.addPass(new OutputPass());
+    const outlinePass = new OutlinePass(
+      new THREE.Vector2(innerWidth, innerHeight), scene, camera
+    );
+    outlinePass.edgeStrength = 3;
+    outlinePass.edgeGlow = 0;
+    outlinePass.edgeThickness = 1;
+    outlinePass.pulsePeriod = 0;
+    outlinePass.visibleEdgeColor.set(0xfff7b0);   // 明黄色白边缘
+    outlinePass.hiddenEdgeColor.set(0x000000);
+    composer.addPass(outlinePass);
+
+    // ─── API 地址解析 + 自动探测 + fetch 封装 ─────────────────
+    // 优先级: localStorage 手动设置 > 自动检测（同 IP:5000）> localhost:5000
+    function resolveAPI() {
+      const saved = localStorage.getItem('api_url');
+      if (saved) return saved;
+      const h = window.location.hostname;
+      if (h && h !== 'localhost' && h !== '127.0.0.1') {
+        // 手机或局域网访问: API 在同一 IP 的 5000 端口
+        return window.location.protocol + '//' + h + ':5000';
+      }
+      return 'http://localhost:5000';
+    }
+    // 手动设置 > 同 IP:5000 > localhost:5000 的所有候选
+    function apiCandidates() {
+      const saved = localStorage.getItem('api_url');
+      const cands = [];
+      if (saved) cands.push(saved.replace(/\/+$/, ''));
+      const h = window.location.hostname;
+      if (h && h !== 'localhost' && h !== '127.0.0.1') {
+        cands.push(window.location.protocol + '//' + h + ':5000');
+      }
+      cands.push('http://localhost:5000');
+      cands.push('http://127.0.0.1:5000');
+      // 去重
+      return [...new Set(cands)];
+    }
+    // 逐个候选发起轻量探测，返回第一个可用的（超时 2.5s）
+    async function probeAPI(cands) {
+      for (const base of cands) {
+        try {
+          const ctrl = new AbortController();
+          const t = setTimeout(() => ctrl.abort(), 2500);
+          const r = await fetch(base + '/api/clothing-types', { signal: ctrl.signal });
+          clearTimeout(t);
+          if (r.ok) return base;
+        } catch (_) { /* 尝试下一个 */ }
+      }
+      return cands[0]; // 全部失败时退回默认
+    }
+    // 全局 API 基址（可被探测结果更新）
+    let API = resolveAPI();
+    console.log('API(initial):', API);
+    (async () => {
+      const found = await probeAPI(apiCandidates());
+      if (found && found !== API) {
+        API = found;
+        console.log('API(auto-detected):', API);
+      } else {
+        console.log('API(using):', API);
+      }
+    })();
+    // 统一 fetch：超时 + 把 fail to fetch 翻译成中文可操作提示
+    async function apiFetch(path, options = {}, timeoutMs = 60000) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+      let res;
+      try {
+        res = await fetch(API + path, { ...options, signal: ctrl.signal });
+      } catch (err) {
+        clearTimeout(timer);
+        const reason = err && err.name === 'AbortError'
+          ? '请求超时（后端处理超过 ' + Math.round(timeoutMs / 1000) + ' 秒）'
+          : '无法连接到后端服务。请确认 Flask 后端已启动，并检查后端地址设置。';
+        const e = new Error(reason + '（当前后端: ' + API + '）');
+        e.apiFail = true;
+        throw e;
+      }
+      clearTimeout(timer);
+      return res;
+    }
+    const CACHE_BUST = '?v=' + Date.now();
+    const mtlLoader = new MTLLoader();
+    const objLoader = new OBJLoader();
+
+    // ─── 服装模型配置 ──────────────────────────────────
+    const CLOTHING_CONFIG = {
+      'upper':      { obj: 'assets/models/Woman-T-Shirt.obj', label: '上衣' },
+      'upper+vest': { obj: 'assets/models/WomanVest.obj',     label: '背心' },
+      'skirt':      { obj: 'assets/models/Skirt.obj',         label: '裙子' },
+      'pants':      { obj: 'assets/models/WomanTrouser.obj',  label: '裤子' },
+      'dress':      { obj: null,                              label: '连衣裙' },
+    };
+
+    const clothingModels = {};    // 已加载的模型缓存: type -> { group, meshes }
+    const renderedClothing = {};  // 当前渲染中的模型: type -> { group, meshes }
+
+    function loadClothingModel(type) {
+      return new Promise((resolve, reject) => {
+        const config = CLOTHING_CONFIG[type];
+        if (!config || !config.obj) {
+          reject(new Error(`无 3D 模型: ${type}`));
+          return;
+        }
+        if (clothingModels[type]) {
+          resolve(clothingModels[type]);
+          return;
+        }
+        console.log(`📦 加载模型: ${config.obj}`);
+        objLoader.load(config.obj + CACHE_BUST, (group) => {
+          const meshes = [];
+          group.traverse((child) => {
+            if (child.isMesh) {
+              child.material = new THREE.MeshStandardMaterial({
+                map: null,
+                color: 0xffffff,
+                roughness: 0.5,
+                metalness: 0.05,
+                side: THREE.DoubleSide,
+              });
+              meshes.push(child);
+            }
+          });
+          clothingModels[type] = { group, meshes };
+          console.log(`✅ ${config.label} 模型加载完成 (${meshes.length} mesh)`);
+          resolve(clothingModels[type]);
+        }, undefined, reject);
+      });
+    }
+
+    function getCheckedOutfit() {
+      return [...document.querySelectorAll('.outfit-option input:checked')].map(cb => cb.value);
+    }
+
+    // ─── 穿搭多选 → 同步渲染 ──────────────────────────
+    function updateOutfit() {
+      const checked = getCheckedOutfit();
+
+      // 移除已取消勾选的模型
+      for (const type of Object.keys(renderedClothing)) {
+        if (!checked.includes(type)) {
+          scene.remove(renderedClothing[type].group);
+          delete renderedClothing[type];
+        }
+      }
+
+      // 加载并添加勾选的模型
+      checked.forEach(type => {
+        if (renderedClothing[type]) return;
+        loadClothingModel(type).then(entry => {
+          // 加载期间可能被取消勾选，再次确认
+          if (!getCheckedOutfit().includes(type)) return;
+          renderedClothing[type] = entry;
+          scene.add(entry.group);
+          refreshTextures();
+          updateBadge();
+        }).catch(err => {
+          console.warn(`⚠ ${type} 模型加载失败:`, err.message);
+        });
+      });
+
+      refreshTextures();
+      updateBadge();
+    }
+
+    function updateBadge() {
+      const checked = getCheckedOutfit();
+      const labels = checked.map(v => CLOTHING_CONFIG[v]?.label || v);
+      const text = checked.length ? `🧍 人台 + ${labels.join(' + ')}` : '🧍 人台';
+      document.getElementById('model-badge').textContent = text;
+    }
+
+    // ─── 纹理管理 ──────────────────────────────────────
+    let currentTextureMode = 'none';   // none | checker | stripe | generated
+    let checkerTexture = null;
+    let stripeTexture = null;
+    let generatedTexture = null;
+    let generatedTextureType = null;
+    const wardrobeTextures = {};   // type -> THREE.Texture（来自衣橱格子点击）
+
+    function applyTextureToEntry(entry, texture) {
+      entry.meshes.forEach(mesh => {
+        mesh.material.map = texture;
+        mesh.material.color.set(0xffffff);
+        mesh.material.needsUpdate = true;
+      });
+    }
+
+    function refreshTextures() {
+      for (const [type, entry] of Object.entries(renderedClothing)) {
+        let tex = null;
+        if (wardrobeTextures[type]) {
+          // 衣橱格子选中的纹理优先
+          tex = wardrobeTextures[type];
+        } else if (currentTextureMode === 'checker') {
+          tex = checkerTexture || (checkerTexture = createCheckerTexture());
+        } else if (currentTextureMode === 'stripe') {
+          tex = stripeTexture || (stripeTexture = createStripeTexture());
+        } else if (currentTextureMode === 'generated') {
+          // 生成纹理只应用到对应的服装类型
+          tex = (type === generatedTextureType) ? generatedTexture : null;
+        }
+        applyTextureToEntry(entry, tex);
+      }
+    }
+
+    // ─── 预设纹理 ──────────────────────────────────────
+    function createCheckerTexture(size = 512, squares = 8) {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const sq = size / squares;
+      for (let y = 0; y < squares; y++) {
+        for (let x = 0; x < squares; x++) {
+          ctx.fillStyle = (x + y) % 2 === 0 ? '#333333' : '#eeeeee';
+          ctx.fillRect(x * sq, y * sq, sq, sq);
+        }
+      }
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    function createStripeTexture(size = 512) {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, size, size);
+      const sw = size / 20;
+      ctx.fillStyle = '#3366cc';
+      for (let i = 0; i < size; i += sw * 2) ctx.fillRect(i, 0, sw, size);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    // ─── 衣橱折叠框展开/收起 ──────────────────────────
+    document.querySelectorAll('.accordion-header').forEach(btn => {
+      btn.addEventListener('click', () => {
+        btn.parentElement.classList.toggle('active');
+      });
+    });
+
+    // ─── 衣橱格子：点击应用 UV 纹理 ────────────────────
+    const wardrobeTexLoader = new THREE.TextureLoader();
+    function applyWardrobeTexture(type, url) {
+      // 确保对应穿搭已勾选并渲染
+      const cb = document.querySelector(`.outfit-option input[value="${type}"]`);
+      if (cb && !cb.checked) {
+        cb.checked = true;
+        updateOutfit();
+      }
+      wardrobeTexLoader.load(url, (tex) => {
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.__wardrobeUrl = url; // 记录来源 URL，供点击格子时做“再点即停”判断
+        wardrobeTextures[type] = tex;
+        refreshTextures();
+      }, undefined, (err) => console.warn('⚠ 衣橱纹理加载失败:', err));
+    }
+
+    // 将分割图加入对应服装类型的衣橱格子
+    function addToWardrobe(type, segPicUrl, textureUrl) {
+      const headers = document.querySelectorAll('.accordion-header');
+      let targetBody = null;
+      headers.forEach(h => {
+        const label = h.textContent;
+        const typeLabel = CLOTHING_CONFIG[type]?.label || type;
+        if (label.includes(typeLabel)) targetBody = h.nextElementSibling;
+      });
+      if (!targetBody) return;
+
+      const grid = targetBody.querySelector('.slot-grid');
+      if (!grid) return;
+
+      // 找到第一个空格子
+      const emptySlot = [...grid.querySelectorAll('.slot')].find(s => !s.classList.contains('filled'));
+      if (!emptySlot) return;
+
+      fillSlot(emptySlot, type, segPicUrl, textureUrl);
+    }
+
+    // 生成"紧贴彩色像素"的缩略图：自动裁掉分割图四周透明/空白区，
+    // 让彩色像素尽量贴近显示框边缘，而不是留下一大片空白。
+    function makeSegThumb(url, maxSize, cb) {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const iw = img.naturalWidth, ih = img.naturalHeight;
+          const scale = Math.min(1, maxSize / Math.max(iw, ih));
+          const w = Math.max(1, Math.round(iw * scale));
+          const h = Math.max(1, Math.round(ih * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(img, 0, 0, w, h);
+          let d = ctx.getImageData(0, 0, w, h).data;
+          let minX = w, minY = h, maxX = -1, maxY = -1;
+          const threshold = 16; // 透明/接近白底都视为空白
+          for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+              const i = (y * w + x) * 4;
+              const a = d[i + 3];
+              const r = d[i], g = d[i + 1], b = d[i + 2];
+              const opaque = a > threshold && (r > 20 || g > 20 || b > 20);
+              if (opaque) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+              }
+            }
+          }
+          if (maxX < minX) {
+            // 全透明 → 直接使用整图
+            cb(canvas.toDataURL('image/png'));
+            return;
+          }
+          // 稍作内边距，避免贴得太紧
+          const pad = 0;
+          const sx = Math.max(0, minX - pad), sy = Math.max(0, minY - pad);
+          const sw = Math.min(w - sx, maxX - minX + 1 + pad * 2);
+          const sh = Math.min(h - sy, maxY - minY + 1 + pad * 2);
+          const out = document.createElement('canvas');
+          out.width = sw; out.height = sh;
+          const octx = out.getContext('2d');
+          octx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+          cb(out.toDataURL('image/png'));
+        } catch (err) {
+          cb(url); // 失败则回退原图
+        }
+      };
+      img.onerror = () => cb(url);
+      img.src = url;
+    }
+
+    // 填充一个格子（生成缩略图 + 绑定交互）
+    // segPicUrl  = 分割图（格子中显示的图片）
+    // textureUrl = UV 纹理（点击/拖到人台时用于 3D 渲染的图）
+    function fillSlot(slot, type, segPicUrl, textureUrl) {
+      slot.classList.add('filled');
+      slot.dataset.clothing = type;
+      slot.dataset.seg = segPicUrl;
+      slot.dataset.texture = textureUrl;
+      slot.innerHTML = '';
+      const img = document.createElement('img');
+      img.alt = type;
+      img.draggable = true;
+      slot.appendChild(img);
+      // 格子中始终显示分割图（紧贴彩色像素的缩略图），而非 UV 纹理图
+      img.src = segPicUrl;
+      makeSegThumb(segPicUrl, 512, (thumbUrl) => { img.src = thumbUrl; });
+      // 注意：不再在此处调用 bindSlotEvents。
+      // 所有 .slot 元素在页面初始化时已统一绑定过一次事件（见下方 forEach），
+      // 若这里再绑定会导致同一格子挂两个 click 监听，造成“再点即停”被瞬时抵消。
+    }
+
+    // 从格子移除服装（弃除/移动后清空原格子）
+    function clearSlot(slot) {
+      slot.classList.remove('filled', 'selected');
+      delete slot.dataset.clothing;
+      delete slot.dataset.seg;
+      delete slot.dataset.texture;
+      slot.innerHTML = '';
+    }
+
+    // ─── 衣橱格子统一交互：点击选纹理 / 右键·长按弃除 / 拖拽移动·渲染 ──
+    const wardrobeContextMenu = document.getElementById('wardrobe-context-menu');
+    const wardrobeFileInput = document.getElementById('wardrobe-file-input');
+    const dropHint = document.getElementById('drop-hint');
+    let wbMenuSlot = null;      // 右键目标格子
+    let wbMenuType = null;      // 右键目标服装类型
+    let draggingSlot = null;    // 当前拖拽的格子
+    let dragStartXY = null;
+
+    function showWardrobeMenu(slot, x, y) {
+      if (!slot || !slot.classList.contains('filled')) return;
+      wbMenuSlot = slot;
+      wbMenuType = slot.dataset.clothing;
+      wardrobeContextMenu.style.left = x + 'px';
+      wardrobeContextMenu.style.top = y + 'px';
+      wardrobeContextMenu.style.display = 'block';
+    }
+    function hideWardrobeMenu() {
+      wardrobeContextMenu.style.display = 'none';
+      wbMenuSlot = null;
+      wbMenuType = null;
+    }
+    document.getElementById('wardrobe-cm-remove').addEventListener('click', () => {
+      const slot = wbMenuSlot;
+      const type = wbMenuType;
+      hideWardrobeMenu();
+      if (!slot) return;
+      clearSlot(slot);
+      // 若弃除的正是当前选中并应用到 3D 的纹理，则移除对应 wardrobeTextures，回到默认纹理
+      if (wardrobeTextures[type]) {
+        delete wardrobeTextures[type];
+        refreshTextures();
+      }
+      showToast('已从衣橱弃除');
+    });
+
+    // 空格子：点击 → 直接打开文件选择器（默认服装类型=所在折叠框类型）
+    function findSlotType(slot) {
+      const body = slot.closest('.accordion-body');
+      if (!body) return 'upper';
+      const header = body.parentElement.querySelector('.accordion-header');
+      const label = header ? header.textContent : '';
+      const entry = Object.entries(CLOTHING_CONFIG).find(([, cfg]) => cfg.label && label.includes(cfg.label));
+      return entry ? entry[0] : 'upper';
+    }
+
+    // 绑定单格事件（点击选纹理 / 右键·长按弃除 / 拖拽）
+    function bindSlotEvents(slot) {
+      slot.addEventListener('click', (e) => {
+        if (draggingSlot) return; // 拖拽结束后的点击忽略
+        if (slot.classList.contains('filled')) {
+          const type = slot.dataset.clothing;
+          const url = slot.dataset.texture;
+          // 若该格子当前的纹理正被渲染，再点一次则停止渲染（回到默认纹理）
+          const isRenderingThis = wardrobeTextures[type] && wardrobeTextures[type].__wardrobeUrl === url;
+          document.querySelectorAll('.slot.filled').forEach(s => s.classList.remove('selected'));
+          if (isRenderingThis) {
+            delete wardrobeTextures[type];
+            refreshTextures();
+            showToast('已停止渲染');
+          } else {
+            slot.classList.add('selected');
+            applyWardrobeTexture(type, url);
+          }
+        } else {
+          // 空格子：打开文件选择器，默认类型为折叠框类型
+          wbFileTarget = slot;
+          wardrobeFileInput.click();
+        }
+      });
+
+      slot.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (slot.classList.contains('filled')) {
+          showWardrobeMenu(slot, e.clientX, e.clientY);
+        }
+      });
+
+      // 长按（移动端）→ 弃除菜单
+      let lpTimer = null, lpStart = null;
+      slot.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return;
+        const t = e.touches[0];
+        lpStart = { x: t.clientX, y: t.clientY };
+        clearTimeout(lpTimer);
+        lpTimer = setTimeout(() => {
+          if (slot.classList.contains('filled')) {
+            showWardrobeMenu(slot, t.clientX, t.clientY);
+          }
+        }, 500);
+      }, { passive: true });
+      slot.addEventListener('touchmove', (e) => {
+        if (lpStart) {
+          const t = e.touches[0];
+          if (Math.abs(t.clientX - lpStart.x) > 12 || Math.abs(t.clientY - lpStart.y) > 12) {
+            clearTimeout(lpTimer);
+          }
+        }
+      }, { passive: true });
+      slot.addEventListener('touchend', () => { clearTimeout(lpTimer); lpStart = null; });
+
+      // 拖拽：有服装的格子可拖到其他格子（移动）或人台（仅渲染）
+      slot.addEventListener('dragstart', (e) => {
+        if (!slot.classList.contains('filled')) { e.preventDefault(); return; }
+        draggingSlot = slot;
+        slot.classList.add('dragging');
+        dragStartXY = { x: e.clientX, y: e.clientY };
+        e.dataTransfer.setData('text/plain', 'wardrobe:' + slot.dataset.clothing);
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      slot.addEventListener('dragend', () => {
+        draggingSlot = null;
+        slot.classList.remove('dragging');
+        document.querySelectorAll('.slot.drag-over').forEach(s => s.classList.remove('drag-over'));
+        dropHint.classList.remove('show');
+      });
+
+      // 高亮可落点的空格子
+      slot.addEventListener('dragover', (e) => {
+        if (!draggingSlot || slot === draggingSlot) return;
+        if (!slot.classList.contains('filled')) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          slot.classList.add('drag-over');
+        } else {
+          slot.classList.remove('drag-over');
+        }
+      });
+      slot.addEventListener('dragleave', () => {
+        slot.classList.remove('drag-over');
+      });
+    }
+
+    // 每个格子统一设置 draggable（空格子不可拖，也便于整体绑定）
+    document.querySelectorAll('.slot').forEach(slot => {
+      slot.draggable = true;
+      bindSlotEvents(slot);
+    });
+    document.querySelectorAll('.slot[data-texture]').forEach(slot => {
+      if (!slot.classList.contains('filled')) return;
+      slot.draggable = true;
+    });
+
+    // 空格子选图完成 → 填入格子
+    let wbFileTarget = null;
+    wardrobeFileInput.addEventListener('change', () => {
+      const slot = wbFileTarget;
+      const file = wardrobeFileInput.files[0];
+      wardrobeFileInput.value = '';
+      wbFileTarget = null;
+      if (!slot || !file) return;
+      const type = findSlotType(slot);
+      const url = URL.createObjectURL(file);
+      fillSlot(slot, type, url, url);
+      showToast('已加入衣橱（' + (CLOTHING_CONFIG[type]?.label || type) + '）');
+    });
+
+    // 拖拽落点：其他空格子（移动）或人台区域（仅渲染）
+    const dropHintTimer = { t: null };
+    function showDropHint(text) {
+      dropHint.textContent = text;
+      dropHint.classList.add('show');
+      clearTimeout(dropHintTimer.t);
+      dropHintTimer.t = setTimeout(() => dropHint.classList.remove('show'), 1600);
+    }
+    document.addEventListener('dragover', (e) => {
+      if (!draggingSlot) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    });
+    document.addEventListener('drop', (e) => {
+      if (!draggingSlot) return;
+      e.preventDefault();
+      const src = draggingSlot;
+      const srcType = src.dataset.clothing;
+      const srcTexture = src.dataset.texture;
+      // 落点若在某个格子上
+      const slotEl = e.target.closest('.slot');
+      if (slotEl) {
+        // 移动到空格子：仅移动格子内容，不应用到人台
+        if (!slotEl.classList.contains('filled') && slotEl !== src) {
+          fillSlot(slotEl, srcType, src.dataset.seg || srcTexture, srcTexture);
+          clearSlot(src);
+          showToast('已移动');
+        } else if (slotEl === src) {
+          showToast('已放回原处');
+        } else {
+          showToast('目标格子已有服装');
+        }
+      } else {
+        // 落到格子之外（人台区域）→ 仅渲染
+        const cb = document.querySelector(`.outfit-option input[value="${srcType}"]`);
+        if (cb && !cb.checked) { cb.checked = true; updateOutfit(); }
+        applyWardrobeTexture(srcType, srcTexture);
+        showDropHint('已应用至人台（格子未移动）');
+      }
+      draggingSlot = null;
+      src.classList.remove('dragging');
+      document.querySelectorAll('.slot.drag-over').forEach(s => s.classList.remove('drag-over'));
+      // 清理 dataTransfer
+      e.dataTransfer.clearData && e.dataTransfer.clearData();
+    });
+
+    // ─── 穿搭多选事件 ──────────────────────────────────
+    document.querySelectorAll('.outfit-option input').forEach(cb => {
+      cb.addEventListener('change', updateOutfit);
+    });
+
+    // ─── 分析照片 → 仅推荐纹理生成目标（不更改渲染） ────
+    const btnAnalyze = document.getElementById('btn-analyze');
+    const btnProcess = document.getElementById('btn-process');
+    const uploadStatus = document.getElementById('upload-status');
+    const selectClothing = document.getElementById('select-clothing');
+
+    btnAnalyze.addEventListener('click', async () => {
+      const photoFile = document.getElementById('file-photo').files[0];
+      if (!photoFile) {
+        uploadStatus.textContent = '请先选择人物照片';
+        uploadStatus.className = 'error';
+        return;
+      }
+      btnAnalyze.disabled = true;
+      btnProcess.disabled = true;
+      uploadStatus.textContent = '🔍 SegFormer 分析中…';
+      uploadStatus.className = 'info';
+
+      try {
+        const fd = new FormData();
+        fd.append('photo', photoFile);
+        const res = await apiFetch('/api/analyze', { method: 'POST', body: fd }, 60000);
+        const data = await res.json();
+
+        if (data.error) throw new Error(data.error);
+
+        const top3 = data.classes.slice(0, 5).map(c => `${c.name}(${c.ratio}%)`).join(', ');
+        uploadStatus.textContent = `📊 检测: ${top3}`;
+        uploadStatus.className = 'success';
+
+        // 自动推荐：仅设置纹理生成目标，不更改渲染页面
+        if (data.suggestion) {
+          selectClothing.value = data.suggestion;
+          uploadStatus.textContent += ` → 推荐: ${data.suggestion}`;
+        }
+      } catch (err) {
+        uploadStatus.textContent = '❌ ' + err.message;
+        uploadStatus.className = 'error';
+      } finally {
+        btnAnalyze.disabled = false;
+        btnProcess.disabled = false;
+      }
+    });
+
+    // ─── 生成纹理（不更改渲染） ────────────────────────
+    btnProcess.addEventListener('click', async () => {
+      const photoFile = document.getElementById('file-photo').files[0];
+      if (!photoFile) {
+        uploadStatus.textContent = '请先选择人物照片';
+        uploadStatus.className = 'error';
+        return;
+      }
+
+      const clothingType = selectClothing.value;
+      btnAnalyze.disabled = true;
+      btnProcess.disabled = true;
+      uploadStatus.textContent = `⏳ AI 管线处理中（${clothingType}）…`;
+      uploadStatus.className = 'info';
+
+      try {
+        const fd = new FormData();
+        fd.append('photo', photoFile);
+        fd.append('clothing_type', clothingType);
+
+        const res = await apiFetch('/process', { method: 'POST', body: fd }, 180000);
+        const result = await res.json();
+        if (result.error && result.stage === 'workbench') {
+          // 后端要求先到案台定位图钉
+          uploadStatus.textContent = '📍 需要先在案台完成图钉定位（已保存分割图到 seg-pic）';
+          uploadStatus.className = 'info';
+          // 自动打开案台并传入分割图信息
+          window.showOnWorkbench(
+            result.seg_pic_url ? `${API}/${result.seg_pic_url}` : '',
+            result.seg_pic_name || '',
+            result.clothing_type || clothingType
+          );
+          btnAnalyze.disabled = false;
+          btnProcess.disabled = false;
+          return;
+        }
+        if (!res.ok) {
+          throw new Error(result.error || '处理失败');
+        }
+        const data = result;
+        const textureUrl = `${API}/${data.texture_url}`;
+        const segPicUrl = `${API}/${data.seg_pic_url}`;
+
+        // 加载纹理并应用
+        const tex = await new Promise((resolve, reject) => {
+          wardrobeTexLoader.load(textureUrl, resolve, undefined, reject);
+        });
+        tex.colorSpace = THREE.SRGBColorSpace;
+        generatedTexture = tex;
+        generatedTextureType = clothingType;
+
+        // 切换到"生成纹理"并应用到对应服装
+        currentTextureMode = 'generated';
+        refreshTextures();
+
+        // 将分割图加入衣橱
+        addToWardrobe(clothingType, segPicUrl, textureUrl);
+
+        uploadStatus.textContent = `✅ 完成！纹理已生成并加入衣橱`;
+        uploadStatus.className = 'success';
+        btnAnalyze.disabled = false;
+        btnProcess.disabled = false;
+      } catch (err) {
+        uploadStatus.textContent = '❌ ' + err.message;
+        uploadStatus.className = 'error';
+        btnAnalyze.disabled = false;
+        btnProcess.disabled = false;
+      }
+    });
+
+    // ─── 初始化：加载人台 + 默认穿搭 ────────────────────
+    console.log('🎯 Virtual Try-On 初始化...');
+    // 人台（使用模型自带的 MTL 材质，白色，而非硬编码的粉色）
+    mtlLoader.load('assets/models/womannequin.mtl', (materials) => {
+      materials.preload();
+      objLoader.setMaterials(materials);
+      objLoader.load('assets/models/womannequin.obj' + CACHE_BUST, (mannequin) => {
+        mannequin.traverse((child) => {
+          if (child.isMesh) {
+            child.material.side = THREE.DoubleSide;
+          }
+        });
+        scene.add(mannequin);
+        console.log('✅ 人台加载完成（自带白色材质）');
+      }, undefined, (err) => console.warn('⚠ 人台 OBJ 加载失败:', err));
+    }, undefined, (err) => {
+      console.warn('⚠ 人台 MTL 加载失败，回退为纯白材质:', err);
+      objLoader.load('assets/models/womannequin.obj' + CACHE_BUST, (mannequin) => {
+        mannequin.traverse((child) => {
+          if (child.isMesh) {
+            child.material = new THREE.MeshStandardMaterial({
+              color: 0xffffff, roughness: 0.6, metalness: 0.1,
+              side: THREE.DoubleSide,
+            });
+          }
+        });
+        scene.add(mannequin);
+      });
+    });
+    // 默认穿搭：上衣已勾选
+    updateOutfit();
+
+    // ─── 渲染循环 ──────────────────────────────────────
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      composer.render();
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      composer.setSize(innerWidth, innerHeight);
+    });
+
+    console.log('🎯 就绪 — 左侧选择穿搭，右侧浏览衣橱');
+
+    // ═══════════════════════════════════════════════════════════
+    // 3D 模型点选：点击高亮线框 / 右键·长按弹出操作菜单
+    // ═══════════════════════════════════════════════════════════
+    const raycaster = new THREE.Raycaster();
+    const pointerNDC = new THREE.Vector2();
+
+    let selectedModel = null;      // 当前选中的 { type }
+
+    function clearSelection() {
+      // 清除边缘轮廓高亮
+      selectedModel = null;
+      outlinePass.selectedObjects = [];
+    }
+
+    function selectModel(type) {
+      clearSelection();
+      const entry = renderedClothing[type];
+      if (!entry) return;
+      selectedModel = { type };
+      // 将服装的所有 mesh 加入轮廓高亮对象（OutlinePass 只描边边缘，不显示内部线框）
+      outlinePass.selectedObjects = entry.meshes.slice();
+    }
+
+    const transparentModels = new Set();  // 当前处于半透明状态的服装类型
+
+    function toggleTransparency(type, on) {
+      const entry = renderedClothing[type];
+      if (!entry) return;
+      entry.meshes.forEach(mesh => {
+        mesh.material.transparent = on;
+        mesh.material.opacity = on ? 0.35 : 1;
+        mesh.material.depthWrite = !on;
+        mesh.material.needsUpdate = true;
+      });
+      if (on) transparentModels.add(type);
+      else transparentModels.delete(type);
+    }
+
+    function isTransparent(type) {
+      return transparentModels.has(type);
+    }
+
+    function detectModelHit(event) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointerNDC.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      pointerNDC.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointerNDC, camera);
+      // 只检测当前渲染中的服装模型（人台不可选）
+      const candidates = [];
+      for (const type of Object.keys(renderedClothing)) {
+        renderedClothing[type].meshes.forEach(m => candidates.push({ mesh: m, type }));
+      }
+      const meshes = candidates.map(c => c.mesh);
+      const hits = raycaster.intersectObjects(meshes, false);
+      if (hits.length === 0) return null;
+      // 取最近的命中，反查类型
+      const hitMesh = hits[0].object;
+      const found = candidates.find(c => c.mesh === hitMesh);
+      return found ? found.type : null;
+    }
+
+    // 单机选中（鼠标）
+    renderer.domElement.addEventListener('click', (e) => {
+      if (e.button !== 0) return;
+      const type = detectModelHit(e);
+      if (type) {
+        selectModel(type);
+        showToast(`已选中：${CLOTHING_CONFIG[type]?.label || type}`);
+      } else {
+        clearSelection();
+      }
+    });
+
+    // ── 右键上下文菜单 ──
+    const cmMenu = document.getElementById('model-context-menu');
+    const cmTitle = document.getElementById('cm-title');
+    const cmTransparentBtn = document.getElementById('cm-transparent');
+    let cmTargetType = null;
+
+    function showContextMenu(type, x, y) {
+      cmTargetType = type;
+      cmTitle.textContent = (CLOTHING_CONFIG[type]?.label || type) + ' · 操作';
+      // 根据当前是否半透明，动态切换按钮文案
+      cmTransparentBtn.textContent = isTransparent(type) ? '🔆 去半透明' : '👁 半透明';
+      cmMenu.style.left = x + 'px';
+      cmMenu.style.top = y + 'px';
+      cmMenu.style.display = 'block';
+      selectModel(type); // 右键时也选中高亮
+    }
+    function hideContextMenu() {
+      cmMenu.style.display = 'none';
+      cmTargetType = null;
+    }
+
+    renderer.domElement.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const type = detectModelHit(e);
+      if (type) {
+        showContextMenu(type, e.clientX, e.clientY);
+      } else {
+        hideContextMenu();
+        clearSelection();
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!cmMenu.contains(e.target)) hideContextMenu();
+      if (!wardrobeContextMenu.contains(e.target)) hideWardrobeMenu();
+    });
+
+    // ── 长按（移动端） ──
+    let longPressTimer = null;
+    let longPressStart = null;
+    renderer.domElement.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      longPressStart = { x: t.clientX, y: t.clientY };
+      clearTimeout(longPressTimer);
+      longPressTimer = setTimeout(() => {
+        const type = detectModelHit({ clientX: t.clientX, clientY: t.clientY });
+        if (type) {
+          showContextMenu(type, t.clientX, t.clientY);
+        }
+      }, 500);
+    }, { passive: true });
+    renderer.domElement.addEventListener('touchmove', (e) => {
+      if (longPressStart) {
+        const t = e.touches[0];
+        if (Math.abs(t.clientX - longPressStart.x) > 12 || Math.abs(t.clientY - longPressStart.y) > 12) {
+          clearTimeout(longPressTimer); // 手指移动视为滚动/旋转，取消长按
+        }
+      }
+    }, { passive: true });
+    renderer.domElement.addEventListener('touchend', (e) => {
+      clearTimeout(longPressTimer);
+      longPressStart = null;
+    });
+
+    // ── 菜单按钮 ──
+    document.getElementById('cm-change').addEventListener('click', () => {
+      const type = cmTargetType;
+      hideContextMenu();
+      if (!type) return;
+      // 打开衣橱面板，并展开对应折叠框
+      togglePanel('right-panel');
+      openAccordionForType(type);
+      showToast(`已展开「${CLOTHING_CONFIG[type]?.label || type}」衣橱，请选择纹理`);
+    });
+
+    document.getElementById('cm-remove').addEventListener('click', () => {
+      const type = cmTargetType;
+      hideContextMenu();
+      if (!type) return;
+      removeModel(type);
+      clearSelection();
+      showToast(`已脱下${CLOTHING_CONFIG[type]?.label || type}`);
+    });
+
+    document.getElementById('cm-transparent').addEventListener('click', () => {
+      const type = cmTargetType;
+      hideContextMenu();
+      if (!type) return;
+      // 切换半透明状态：当前半透明则去半透明，否则半透明
+      const on = !isTransparent(type);
+      toggleTransparency(type, on);
+      showToast(`${CLOTHING_CONFIG[type]?.label || type} ${on ? '已半透明' : '已恢复正常'}`);
+    });
+
+    function removeModel(type) {
+      if (renderedClothing[type]) {
+        scene.remove(renderedClothing[type].group);
+        // 移除时重置透明度状态，避免缓存材质残留半透明
+        toggleTransparency(type, false);
+        delete renderedClothing[type];
+      }
+      transparentModels.delete(type);
+      // 同步取消穿搭勾选
+      const cb = document.querySelector(`.outfit-option input[value="${type}"]`);
+      if (cb) cb.checked = false;
+      updateBadge();
+    }
+
+    function openAccordionForType(type) {
+      const label = CLOTHING_CONFIG[type]?.label || type;
+      document.querySelectorAll('.accordion').forEach(acc => {
+        const header = acc.querySelector('.accordion-header');
+        if (header && header.textContent.includes(label)) {
+          acc.classList.add('active');
+        }
+      });
+    }
+
+    // ── 简易 Toast 提示 ──
+    let toastEl = null;
+    function showToast(msg) {
+      if (!toastEl) {
+        toastEl = document.createElement('div');
+        toastEl.id = 'model-toast';
+        toastEl.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:120;background:rgba(20,20,30,0.92);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,0.4);transition:opacity .3s;pointer-events:none;';
+        document.body.appendChild(toastEl);
+      }
+      toastEl.textContent = msg;
+      toastEl.style.opacity = '1';
+      clearTimeout(toastEl._t);
+      toastEl._t = setTimeout(() => { toastEl.style.opacity = '0'; }, 2200);
+    }
+
+    // ─── 手机端面板切换（工具/衣橱/设置，互斥展开） ──
+    const MOBILE_PANELS = ['left-panel', 'right-panel', 'workbench-panel', 'settings-panel'];
+    window.togglePanel = function(panelId) {
+      const panel = document.getElementById(panelId);
+      const isOpen = panel.classList.contains('expanded');
+      // 关闭所有面板
+      MOBILE_PANELS.forEach(id => document.getElementById(id).classList.remove('expanded'));
+      document.querySelectorAll('#bottom-nav .nav-item').forEach(b => b.classList.remove('active'));
+      // 若之前未展开，则展开选中的面板
+      if (!isOpen) {
+        panel.classList.add('expanded');
+        const navBtn = document.querySelector(`#bottom-nav .nav-item[data-panel="${panelId}"]`);
+        if (navBtn) navBtn.classList.add('active');
+        // 打开设置面板时同步当前 API 状态
+        if (panelId === 'settings-panel') {
+          document.getElementById('settings-api-input-mobile').value = localStorage.getItem('api_url') || '';
+          const st = document.getElementById('settings-status-mobile');
+          st.textContent = '当前: ' + API + '（检测中…）';
+          st.style.color = '#7c6ff7';
+          probeAPI(apiCandidates()).then((found) => {
+            if (found && found !== API) API = found;
+            st.textContent = '当前: ' + API;
+            st.style.color = API ? '#4cff8d' : '#ff6b6b';
+          }).catch(() => {
+            st.textContent = '当前: ' + API;
+            st.style.color = '#ff6b6b';
+          });
+        }
+      }
+    };
+
+    // ─── 手机端设置面板 ──────────────────────────────
+    window.closeSettingsMobile = function() {
+      togglePanel('settings-panel');
+    };
+    window.saveSettingsMobile = function() {
+      const val = document.getElementById('settings-api-input-mobile').value.trim();
+      if (val) {
+        localStorage.setItem('api_url', val);
+        document.getElementById('settings-status-mobile').textContent = '✅ 已保存，重启应用生效';
+        document.getElementById('settings-status-mobile').style.color = '#4cff8d';
+      } else {
+        localStorage.removeItem('api_url');
+        document.getElementById('settings-status-mobile').textContent = '✅ 已恢复默认，重启应用生效';
+        document.getElementById('settings-status-mobile').style.color = '#4cff8d';
+      }
+    };
+
+    // --- Workbench (pin) logic ---
+    const MAX_PINS = 7;
+    let wbPins = [];
+    let wbPinMode = false;
+    let wbSegPicName = '';
+    let wbClothingType = 'upper';
+    const wbPinToggle = document.getElementById('wb-pin-toggle');
+    const wbStatus = document.getElementById('wb-status');
+    const wbSaveBtn = document.getElementById('wb-save-btn');
+    const wbMapBtn = document.getElementById('wb-map-btn');
+    const wbCanvasWrap = document.getElementById('wb-canvas-wrap');
+    const wbPinCount = document.getElementById('wb-pin-count');
+
+    wbPinToggle.addEventListener('click', () => {
+      wbPinMode = !wbPinMode;
+      wbPinToggle.classList.toggle('active', wbPinMode);
+      wbStatus.textContent = '图钉模式: ' + (wbPinMode ? '开' : '关');
+      const canvas = document.getElementById('wb-pin-canvas');
+      if (canvas) canvas.style.cursor = wbPinMode ? 'crosshair' : 'default';
+    });
+
+    function setupWbCanvas() {
+      const wrap = document.getElementById('wb-canvas-wrap');
+      let canvas = document.getElementById('wb-pin-canvas');
+      if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.id = 'wb-pin-canvas';
+        wrap.appendChild(canvas);
+      }
+      const img = wrap.querySelector('img');
+      if (!img) return;
+      const resizeCanvas = () => {
+        canvas.width = img.clientWidth;
+        canvas.height = img.clientHeight;
+        drawWbPins();
+      };
+      if (img.complete) { setTimeout(resizeCanvas, 50); }
+      else { img.onload = resizeCanvas; }
+      window.addEventListener('resize', resizeCanvas);
+
+      // 计算图片在 object-fit: contain 下实际显示的矩形（扣除黑边/留白）
+      const containedRect = () => {
+        const iw = img.naturalWidth, ih = img.naturalHeight;
+        const cw = img.clientWidth, ch = img.clientHeight;
+        if (!iw || !ih || !cw || !ch) return { left: 0, top: 0, width: cw, height: ch };
+        const scale = Math.min(cw / iw, ch / ih);
+        const dw = iw * scale, dh = ih * scale;
+        return { left: (cw - dw) / 2, top: (ch - dh) / 2, width: dw, height: dh };
+      };
+
+      canvas.onclick = (e) => {
+        if (!wbPinMode) return;
+        if (wbPins.length >= MAX_PINS) { wbStatus.textContent = '已达上限 ' + MAX_PINS + ' 个图钉'; return; }
+        const rect = canvas.getBoundingClientRect();
+        const cr = containedRect();
+        const rx = (e.clientX - rect.left - cr.left) / cr.width;
+        const ry = (e.clientY - rect.top - cr.top) / cr.height;
+        if (rx < 0 || rx > 1 || ry < 0 || ry > 1) {
+          wbStatus.textContent = '请点在服装图片上';
+          return;
+        }
+        wbPins.push({ x: Math.round(rx * 1000) / 1000, y: Math.round(ry * 1000) / 1000 });
+        drawWbPins();
+        updateWbButtons();
+      };
+
+      canvas.oncontextmenu = (e) => {
+        e.preventDefault();
+        if (wbPins.length > 0) {
+          wbPins.pop();
+          drawWbPins();
+          updateWbButtons();
+        }
+      };
+    }
+
+    function drawWbPins() {
+      const canvas = document.getElementById('wb-pin-canvas');
+      if (!canvas) return;
+      const wrap = document.getElementById('wb-canvas-wrap');
+      const img = wrap ? wrap.querySelector('img') : null;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // 图钉画在图片实际显示区域内（含 object-fit: contain 的偏移）
+      let ox = 0, oy = 0, dw = canvas.width, dh = canvas.height;
+      if (img) {
+        const iw = img.naturalWidth, ih = img.naturalHeight;
+        if (iw && ih) {
+          const cw = canvas.width, ch = canvas.height;
+          const scale = Math.min(cw / iw, ch / ih);
+          dw = iw * scale; dh = ih * scale;
+          ox = (cw - dw) / 2; oy = (ch - dh) / 2;
+        }
+      }
+      wbPins.forEach((pin, i) => {
+        const px = ox + pin.x * dw;
+        const py = oy + pin.y * dh;
+        ctx.beginPath();
+        ctx.arc(px, py, 8, 0, Math.PI * 2);
+        ctx.fillStyle = '#ff3333';
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(i + 1), px, py);
+      });
+      wbPinCount.textContent = wbPins.length > 0
+        ? '\u5df2\u653e\u7f6e ' + wbPins.length + '/' + MAX_PINS + ' \u4e2a\u56fe\u9489' : '';
+    }
+
+    function updateWbButtons() {
+      wbSaveBtn.disabled = wbPins.length < 2;
+      wbMapBtn.disabled = wbPins.length < 2 || !wbSegPicName;
+    }
+
+    wbSaveBtn.addEventListener('click', async () => {
+      if (!wbSegPicName || wbPins.length < 2) return;
+      try {
+        const res = await apiFetch('/api/save-pins', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ seg_pic_name: wbSegPicName, pins: wbPins, clothing_type: wbClothingType })
+        }, 30000);
+        const data = await res.json();
+        if (data.ok) { wbStatus.textContent = '\u56fe\u9489\u5df2\u4fdd\u5b58!'; wbStatus.style.color = '#4cff8d'; }
+        else { wbStatus.textContent = '\u4fdd\u5b58\u5931\u8d25: ' + (data.error || ''); wbStatus.style.color = '#ff6b6b'; }
+      } catch (err) { wbStatus.textContent = '\u4fdd\u5b58\u9519\u8bef: ' + err.message; wbStatus.style.color = '#ff6b6b'; }
+    });
+
+    wbMapBtn.addEventListener('click', async () => {
+      if (!wbSegPicName || wbPins.length < 2) return;
+      wbMapBtn.disabled = true;
+      wbStatus.textContent = '\u6620\u5c04\u4e2d...'; wbStatus.style.color = '#7c6ff7';
+      try {
+        const res = await apiFetch('/api/map-pins', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ seg_pic_name: wbSegPicName, clothing_type: wbClothingType })
+        }, 120000);
+        const data = await res.json();
+        if (data.texture_url) {
+          wbStatus.textContent = '\u6620\u5c04\u6210\u529f!'; wbStatus.style.color = '#4cff8d';
+          const textureUrl = API + '/' + data.texture_url;
+          wardrobeTexLoader.load(textureUrl, (tex) => {
+            tex.colorSpace = THREE.SRGBColorSpace;
+            wardrobeTextures[wbClothingType] = tex;
+            refreshTextures();
+          });
+          const cb = document.querySelector('.outfit-option input[value="' + wbClothingType + '"]');
+          if (cb && !cb.checked) { cb.checked = true; updateOutfit(); }
+        } else {
+          wbStatus.textContent = '\u6620\u5c04\u5931\u8d25: ' + (data.error || ''); wbStatus.style.color = '#ff6b6b';
+        }
+      } catch (err) { wbStatus.textContent = '\u6620\u5c04\u9519\u8bef: ' + err.message; wbStatus.style.color = '#ff6b6b'; }
+      wbMapBtn.disabled = false;
+    });
+
+    window.showOnWorkbench = function(segPicUrl, segPicName, clothingType) {
+      wbSegPicName = segPicName || '';
+      wbClothingType = clothingType || 'upper';
+      wbPins = [];
+      const wrap = document.getElementById('wb-canvas-wrap');
+      wrap.innerHTML = '<img src="' + segPicUrl + '" alt="seg-pic" />';
+      setupWbCanvas();
+      updateWbButtons();
+      wbPinCount.textContent = '';
+      wbStatus.textContent = '\u56fe\u9489\u6a21\u5f0f: \u5173';
+      togglePanel('workbench-panel');
+    };
+
+  </script>
+</body>
+</html>

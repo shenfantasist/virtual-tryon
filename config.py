@@ -28,9 +28,6 @@ SEGFORMER_MODEL_DIR = r'D:\segformer_b2_clothes\model_weights'
 # BiRefNet 模型文件名
 BIREFNET_WEIGHTS_FILENAME = 'model.safetensors'
 
-# 本地 BiRefNet 代码目录（项目内副本）
-BIREFNET_LOCAL_DIR = os.path.join(PROJECT_ROOT, 'BiRefNet_model')
-
 # 静态资源目录
 ASSETS_DIR = os.path.join(PROJECT_ROOT, 'assets')
 MODELS_DIR = os.path.join(ASSETS_DIR, 'models')
@@ -39,6 +36,11 @@ TEXTURE_DIR = os.path.join(ASSETS_DIR, 'Texture')
 CLOTHING_DIR = os.path.join(ASSETS_DIR, 'clothing')
 BIREFNET_ASSETS_DIR = os.path.join(ASSETS_DIR, 'BiRefNet_model')
 
+# 本地 BiRefNet 代码目录（项目内副本）
+BIREFNET_LOCAL_DIR = os.path.join(ASSETS_DIR, 'BiRefNet_model')
+# BiRefNet 代码所在包的父目录（用于 from BiRefNet_model.birefnet import BiRefNet）
+BIREFNET_PACKAGE_DIR = ASSETS_DIR
+
 
 # ═══════════════════════════════════════════════════════════════
 #  服务器配置
@@ -46,7 +48,7 @@ BIREFNET_ASSETS_DIR = os.path.join(ASSETS_DIR, 'BiRefNet_model')
 
 SERVER_HOST = '0.0.0.0'
 SERVER_PORT = 5000
-SERVER_DEBUG = True
+SERVER_DEBUG = False
 FRONTEND_LIVE_SERVER_PORT = 5500
 
 
@@ -55,37 +57,54 @@ FRONTEND_LIVE_SERVER_PORT = 5500
 # ═══════════════════════════════════════════════════════════════
 
 # BiRefNet 默认推理参数
-BIREFNET_INFER_SIZE = 1024
+BIREFNET_INFER_SIZE = 768
 BIREFNET_QUANTIZE = True  # CPU INT8 量化加速
 
 # SegFormer B2 推理参数
 SEGFORMER_INFERENCE_SIZE = 1024
 
-# ImageNet 归一化参数
+# 图像归一化参数（ImageNet 标准）
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
 
 # ═══════════════════════════════════════════════════════════════
-#  服装类型配置
+#  SegFormer 18 类语义标签
 # ═══════════════════════════════════════════════════════════════
 
-# SegFormer 18 类语义标签
 SEGFORMER_CLASSES = {
-    0:  'Background', 1: 'Hat', 2: 'Hair', 3: 'Glove',
-    4:  'Upper-clothes', 5: 'Skirt', 6: 'Pants', 7: 'Dress',
-    8:  'Belt', 9: 'Left-shoe', 10: 'Right-shoe', 11: 'Face',
-    12: 'Left-leg', 13: 'Right-leg', 14: 'Left-arm',
-    15: 'Right-arm', 16: 'Bag', 17: 'Scarf',
+    0: '背景',
+    1: '帽子',
+    2: '头发',
+    3: '太阳镜',
+    4: '上衣',
+    5: '裙子',
+    6: '裤子',
+    7: '连衣裙',
+    8: '腰带',
+    9: '左鞋',
+    10: '右鞋',
+    11: '脸',
+    12: '左腿',
+    13: '右腿',
+    14: '左臂',
+    15: '右臂',
+    16: '包',
+    17: '围巾',
 }
+
+
+# ═══════════════════════════════════════════════════════════════
+#  服装类型映射
+# ═══════════════════════════════════════════════════════════════
 
 # 用户可选服装类型 -> SegFormer class IDs
 CLOTHING_TYPE_MAP = {
-    'upper': (4,),             # 上衣
-    'skirt': (5,),             # 裙子
-    'pants': (6,),             # 裤子
-    'dress': (7,),             # 连衣裙
-    'upper+vest': (4,),        # 背心（也用上衣类）
+    'upper':      (4,),              # 上衣
+    'skirt':      (5,),              # 裙子
+    'pants':      (6,),              # 裤子
+    'dress':      (7,),              # 连衣裙
+    'upper+vest': (4,),              # 背心（也用上衣类）
 }
 
 # 服装类型 -> 推荐 UV 模板（相对于 assets/）

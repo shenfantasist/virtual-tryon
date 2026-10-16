@@ -26,7 +26,7 @@ from PIL import Image
 import config
 
 # BiRefNet 代码目录加入 path
-sys.path.insert(0, config.BIREFNET_LOCAL_DIR)
+sys.path.insert(0, config.BIREFNET_PACKAGE_DIR)
 
 import torch
 import torch.nn.functional as F
@@ -53,7 +53,7 @@ def _get_birefnet(quantize=True, infer_size=1024):
     if _birefnet_model is not None:
         return _birefnet_model, _birefnet_device
 
-    from models.birefnet import BiRefNet
+    from BiRefNet_model.birefnet import BiRefNet
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     weights_dir = os.path.join(config.BIREFNET_MODEL_DIR, 'weights')

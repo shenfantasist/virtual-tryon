@@ -1,0 +1,25 @@
+{
+  "appId": "com.virtualtryon.app",
+  "appName": "Virtual Try-On",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true,
+    "errorPath": "error.html"
+  },
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#0a0a14"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "backgroundColor": "#0a0a14",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0a0a14"
+    }
+  }
+}

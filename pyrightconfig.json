@@ -1,0 +1,7 @@
+{
+    "extraPaths": [
+        "./assets"
+    ],
+    "reportMissingImports": true,
+    "pythonVersion": "3.10"
+}

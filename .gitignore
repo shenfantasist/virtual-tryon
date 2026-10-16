@@ -24,10 +24,15 @@ Thumbs.db
 _tmp_upload*
 *.tmp
 
+# Node
+node_modules/
+
 # Large model / asset files (>25MB, exceed GitHub file size limit or repo size warning)
-assets/BiRefNet_model/model.safetensors
-assets/models/WomanTrouser.obj
-assets/models/womannequin.obj
+*.safetensors
+WomanTrouser.obj
+womannequin.obj
+Woman-TS&Trouser.obj
+Woman-Trouser&TS.obj
 
 # 服装参考大图（可选）
 # assets/clothing/*.jpg

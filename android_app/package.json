@@ -1,0 +1,23 @@
+{
+  "name": "virtual-tryon-android",
+  "version": "1.0.0",
+  "description": "Virtual Try-On Android App (Capacitor WebView wrapper for Flask+Three.js frontend)",
+  "main": "index.js",
+  "scripts": {
+    "sync": "cap sync android",
+    "build:apk": "cd android && gradlew assembleDebug",
+    "build:release": "cd android && gradlew assembleRelease"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/cli": "^6.1.2",
+    "@capacitor/core": "^6.1.2",
+    "@capacitor/preferences": "^6.0.2",
+    "@capacitor/splash-screen": "^6.0.2",
+    "@capacitor/status-bar": "^6.0.2",
+    "@capacitor/camera": "^6.0.2",
+    "@capacitor/filesystem": "^6.0.2"
+  }
+}
